@@ -4,7 +4,7 @@
 
 # Dev
 
-1. Clone prject
+1. Clone project
 2. Node modules: ```yarn```
 3. Copy ```.env.template``` and rename to ```.env```
 4. Postgres: ```docker-compose up -d```

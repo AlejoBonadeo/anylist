@@ -1,25 +1,73 @@
-import { Resolver, Query, Mutation, Args, Int } from '@nestjs/graphql';
+import { UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Resolver, Query, Mutation, Args, Int, ID, ResolveField, Parent } from '@nestjs/graphql';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ValidRoles } from '../auth/types/valid-roles.enum';
 import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
-import { CreateUserInput } from './dto/create-user.input';
+import { ValidRolesArgs } from './dto/roles.arg';
 import { UpdateUserInput } from './dto/update-user.input';
+import { Item } from '../items/entities/item.entity';
+import { ItemsService } from '../items/items.service';
 
 @Resolver(() => User)
+@UseGuards(JwtAuthGuard)
 export class UsersResolver {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly itemsService: ItemsService,
+    ) {}
 
   @Query(() => [User], { name: 'users' })
-  findAll(): Promise<User[]> {
-    return this.usersService.findAll();
+  findAll(
+    @Args() validRoles: ValidRolesArgs,
+    @CurrentUser([ValidRoles.admin, ValidRoles.superUser]) _user: User,
+  ): Promise<User[]> {
+    return this.usersService.findAll(validRoles.roles);
   }
 
   @Query(() => User, { name: 'user' })
-  findOne(@Args('id', { type: () => Int }) id: number) {
-    return this.usersService.findOne(id);
+  findOne(
+    @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
+    @CurrentUser([ValidRoles.admin, ValidRoles.superUser]) _user: User,
+    ): Promise<User> {
+    return this.usersService.findOneById(id);
   }
 
-  @Mutation(() => User)
-  blockUser(@Args('id', { type: () => Int }) id: string) {
-    return this.usersService.block(id);
+  @Mutation(() => User, { name: 'blockUser' })
+  blockUser(
+    @Args('id', { type: () => ID }) id: string,
+    @CurrentUser([ValidRoles.admin, ValidRoles.superUser]) user: User,
+  ): Promise<User> {
+    return this.usersService.block(id, user);
+  }
+
+  @Mutation(() => User, { name: 'updateUser' })
+  updateUser(
+    @Args('updateUserInput') updateUserInput: UpdateUserInput,
+    @CurrentUser([ValidRoles.admin, ValidRoles.superUser]) user: User,
+  ): Promise<User> {
+    return this.usersService.update(updateUserInput.id, updateUserInput, user)
+  }
+
+  @ResolveField('lastUpdatedBy', () => User, { nullable: true })
+  async getLastUpdatedBy(@Parent()user: User): Promise<User> {
+    return this.usersService.findLastUpdatedBy(user.id);
+  }
+
+  @ResolveField('items', () => [Item])
+  async getItems(
+    @Parent()user: User,
+    @CurrentUser([ValidRoles.admin]) _user: User
+    ): Promise<Item[]> {
+    return this.itemsService.findByUser(user.id);
+  }
+
+  @ResolveField('itemCount', () => Int)
+  async itemCount(
+    @Parent() user: User,
+    @CurrentUser([ValidRoles.admin]) _user: User
+  ): Promise<number> {
+    return this.itemsService.itemCountByUser(user);
   }
 }
