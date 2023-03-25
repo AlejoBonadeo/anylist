@@ -1,11 +1,20 @@
 import { ParseUUIDPipe, UseGuards } from '@nestjs/common';
-import { Resolver, Query, Mutation, Args, ID, ResolveField, Parent } from '@nestjs/graphql';
+import {
+  Resolver,
+  Query,
+  Mutation,
+  Args,
+  ID,
+  ResolveField,
+  Parent,
+} from '@nestjs/graphql';
 import { ItemsService } from './items.service';
 import { Item } from './entities/item.entity';
 import { User } from '../users/entities/user.entity';
 import { UpdateItemInput, CreateItemInput } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { PaginationArgs, SearchArgs } from '../common/dto';
 
 @Resolver(() => Item)
 @UseGuards(JwtAuthGuard)
@@ -21,8 +30,12 @@ export class ItemsResolver {
   }
 
   @Query(() => [Item], { name: 'items' })
-  findAll(@CurrentUser() user: User): Promise<Item[]> {
-    return this.itemsService.findAll(user);
+  findAll(
+    @CurrentUser() user: User,
+    @Args() paginationArgs: PaginationArgs,
+    @Args() searchArgs: SearchArgs,
+  ): Promise<Item[]> {
+    return this.itemsService.findAll(user, paginationArgs, searchArgs);
   }
 
   @Query(() => Item, { name: 'item' })
@@ -37,7 +50,7 @@ export class ItemsResolver {
   updateItem(
     @Args('updateItemInput') updateItemInput: UpdateItemInput,
     @CurrentUser() user: User,
-    ): Promise<Item> {
+  ): Promise<Item> {
     return this.itemsService.update(updateItemInput.id, updateItemInput, user);
   }
 
@@ -45,12 +58,12 @@ export class ItemsResolver {
   removeItem(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
-    ): Promise<Item> {
+  ): Promise<Item> {
     return this.itemsService.remove(id, user);
   }
 
   @ResolveField('user', () => User)
-  async getLastUpdatedBy(@Parent()item: Item): Promise<User> {
+  async getLastUpdatedBy(@Parent() item: Item): Promise<User> {
     return this.itemsService.findUser(item.id);
   }
 }

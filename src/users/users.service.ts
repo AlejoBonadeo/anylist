@@ -13,6 +13,7 @@ import { NotFoundException } from '@nestjs/common';
 import { ValidRoles } from '../auth/types/valid-roles.enum';
 import { UpdateUserInput } from './dto/update-user.input';
 import { Item } from '../items/entities/item.entity';
+import { PaginationArgs, SearchArgs } from '../common/dto';
 
 @Injectable()
 export class UsersService {
@@ -36,17 +37,27 @@ export class UsersService {
     }
   }
 
-  async findAll(roles: ValidRoles[]): Promise<User[]> {
-    if (!roles.length)
-      return this.usersRepository.find({
-        relations: { lastUpdatedBy: true },
-      });
-
-    return await this.usersRepository
+  async findAll(
+    roles: ValidRoles[],
+    { limit, offset }: PaginationArgs,
+    { search }: SearchArgs,
+  ): Promise<User[]> {
+    const queryBuilder = await this.usersRepository
       .createQueryBuilder()
-      .andWhere('ARRAY[roles] && ARRAY[:...roles]')
-      .setParameter('roles', roles)
-      .getMany();
+      .take(limit)
+      .skip(offset);
+
+    if (search) {
+      queryBuilder.andWhere('LOWER("fullName") like :name', {
+        name: `%${search.toLowerCase()}%`,
+      });
+    }
+    if (roles.length) {
+      queryBuilder
+        .andWhere('ARRAY[roles] && ARRAY[:...roles]')
+        .setParameter('roles', roles);
+    }
+    return queryBuilder.getMany();
   }
 
   async findOneByEmail(email: string) {

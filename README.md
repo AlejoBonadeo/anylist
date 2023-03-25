@@ -10,3 +10,4 @@
 4. Postgres: ```docker-compose up -d```
 5. Server: ```yarn start:dev```
 6. ```localhost:3000/graphql```
+7. Execute mutation ```executeSeed```
